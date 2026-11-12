@@ -1,0 +1,82 @@
+id: AAAA_Record
+
+info:
+  name: AAAA Record - Default Page / Unclaimed IPv6 Endpoint Candidate
+  author: XORO1337
+  severity: medium
+  description: |
+    The hostname has an AAAA record and the HTTP endpoint returns a generic
+    default or placeholder page. This can indicate an orphaned IPv6 endpoint or
+    a server that is no longer associated with the hostname.
+
+    This is a heuristic. A default page alone does not prove that the IPv6
+    address can be claimed. Confirm with the cloud provider's address inventory
+    before reporting.
+  impact: |
+    If the IPv6 address is unclaimed or can be reassigned, the hostname may be
+    taken over and used to serve content under the organization's domain.
+  remediation: |
+    Release unused IPv6 addresses, terminate orphaned instances, and remove DNS
+    records that point at them. Monitor DNS for records pointing to default
+    cloud pages.
+  reference:
+    - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html
+    - https://www.cloudflare.com/learning/dns/dns-records/dns-aaaa-record/
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 2
+  tags: dns,takeover,aaaa-record,ipv6,candidate
+
+dns:
+  - name: "{{FQDN}}"
+    type: AAAA
+    class: inet
+    recursion: true
+    retries: 3
+
+    matchers:
+      - type: regex
+        part: answer
+        internal: true
+        regex:
+          - '(?i)IN\s+AAAA\s+[0-9a-f:]+'
+
+    extractors:
+      - type: regex
+        name: dns_aaaa
+        part: answer
+        group: 1
+        internal: true
+        regex:
+          - '(?i)IN\s+AAAA\s+([0-9a-f:]+)'
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        condition: and
+        dsl:
+          - "len(dns_aaaa) > 0"
+          - "status_code == 200 || status_code == 403 || status_code == 404"
+
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "Welcome to nginx!"
+          - "It works!"
+          - "Apache2 Ubuntu Default Page"
+          - "Apache2 Debian Default Page"
+          - "Test Page for the Apache HTTP Server"
+          - "IIS Windows Server"
+          - "Welcome to OpenResty!"
+          - "Welcome to CentOS"
+          - "Default Web Site Page"
+          - "Site not found"
+          - "This domain is not configured"
+          - "Domain not found"

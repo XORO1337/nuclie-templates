@@ -1,0 +1,58 @@
+id: CNAME_Takeover
+
+info:
+  name: Dangling CNAME - Subdomain Takeover Candidate
+  author: n0x
+  severity: medium
+  description: |
+    The target resolves through a CNAME chain that terminates in NXDOMAIN.
+    A dangling CNAME is a subdomain-takeover candidate: if the CNAME target can
+    be registered or claimed at the third-party provider, an attacker may be
+    able to serve content on the target hostname.
+
+    This template only identifies the DNS condition. It does not prove that the
+    target is claimable. Confirm by checking the provider's dashboard or API
+    before reporting.
+  impact: |
+    A successfully claimed dangling CNAME can let an attacker host arbitrary
+    content on a trusted subdomain, intercept cookies scoped to the parent
+    domain, bypass origin checks, or conduct phishing.
+  remediation: |
+    Remove the stale CNAME record, or re-create/claim the target resource at the
+    provider. Add DNS record lifecycle checks to prevent dangling records after
+    cloud resources are deleted.
+  reference:
+    - https://securitytrails.com/blog/subdomain-takeover-tips
+    - https://docs.microsoft.com/en-us/azure/security/fundamentals/subdomain-takeover
+    - https://github.com/EdOverflow/can-i-take-over-xyz
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 1
+  tags: dns,takeover,cname,candidate
+
+dns:
+  - name: "{{FQDN}}"
+    type: A
+    class: inet
+    recursion: true
+    retries: 3
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "NXDOMAIN"
+
+      - type: regex
+        part: answer
+        regex:
+          - '(?i)IN\s+CNAME\s+'
+
+    extractors:
+      - type: regex
+        name: cname
+        part: raw
+        group: 1
+        regex:
+          - '(?im)^[^;\s]\S*\s+\d+\s+IN\s+CNAME\s+(\S+)\s*$'

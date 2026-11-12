@@ -1,0 +1,84 @@
+id: A_Record
+
+info:
+  name: A Record - Default Page / Unclaimed Cloud IP Candidate
+  author: XORO1337
+  severity: medium
+  description: |
+    The hostname has an A record and the HTTP endpoint returns a generic
+    default or placeholder page. This can indicate an orphaned cloud instance,
+    an unclaimed Elastic IP, or a server that is no longer associated with the
+    hostname.
+
+    This is a heuristic. A default page alone does not prove that the IP can be
+    claimed. Confirm with the cloud provider's IP/Elastic IP inventory and the
+    account that owns the address before reporting.
+  impact: |
+    If the address is an unclaimed Elastic IP or an orphaned instance that an
+    attacker can launch, the hostname can be taken over and used to serve
+    content under the organization's domain.
+  remediation: |
+    Release unused Elastic IPs, terminate orphaned instances, and remove DNS
+    records that point at them. Monitor DNS for records pointing to default
+    cloud pages.
+  reference:
+    - https://infosecwriteups.com/dangling-dns-aws-ec2-e2d801701e8
+    - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 2
+  tags: dns,takeover,a-record,elastic-ip,candidate
+
+dns:
+  - name: "{{FQDN}}"
+    type: A
+    class: inet
+    recursion: true
+    retries: 3
+
+    matchers:
+      - type: regex
+        part: answer
+        internal: true
+        regex:
+          - '(?i)IN\s+A\s+[0-9]{1,3}(\.[0-9]{1,3}){3}'
+
+    extractors:
+      - type: regex
+        name: dns_a
+        part: answer
+        group: 1
+        internal: true
+        regex:
+          - '(?i)IN\s+A\s+([0-9]{1,3}(\.[0-9]{1,3}){3})'
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        condition: and
+        dsl:
+          - "len(dns_a) > 0"
+          - "status_code == 200 || status_code == 403 || status_code == 404"
+
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "Welcome to nginx!"
+          - "It works!"
+          - "Apache2 Ubuntu Default Page"
+          - "Apache2 Debian Default Page"
+          - "Test Page for the Apache HTTP Server"
+          - "IIS Windows Server"
+          - "Welcome to OpenResty!"
+          - "Welcome to CentOS"
+          - "Default Web Site Page"
+          - "Site not found"
+          - "This domain is not configured"
+          - "Domain not found"
