@@ -1,0 +1,80 @@
+id: mx_record_takeover
+
+info:
+  name: MX Record - Dead Mail Exchange Takeover Candidate
+  author: XORO1337
+  severity: medium
+  description: |
+    The target has an MX record whose mail exchange hostname does not resolve
+    (NXDOMAIN, SERVFAIL, or REFUSED). If the MX hostname can be registered or
+    claimed at the mail provider, an attacker may be able to receive mail
+    addressed to the domain, including password-reset and verification email.
+
+    This template checks A records only. An IPv6-only MX may be reported as
+    dead; confirm AAAA resolution before treating it as a finding.
+  impact: |
+    A claimed MX hostname can intercept inbound email, enabling password-reset
+    theft, account takeover, and phishing from the organization's domain.
+  remediation: |
+    Remove stale MX records, restore the mail exchange hostname, or move mail
+    routing to a provider-controlled MX. Monitor MX targets for non-resolution.
+  reference:
+    - https://www.cloudflare.com/learning/dns/dns-records/dns-mx-record/
+    - https://mxtoolbox.com/
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 3
+  tags: dns,takeover,mx,mail,candidate
+
+flow: |
+  dns(1);
+  for (let mx of iterate(template["mx_host"])) {
+    set("mx_target", mx);
+    dns(2);
+  }
+
+dns:
+  - id: mx-records
+    name: "{{FQDN}}"
+    type: MX
+    class: inet
+    recursion: true
+    retries: 3
+
+    matchers:
+      - type: regex
+        part: answer
+        regex:
+          - '(?i)IN\s+MX\s+'
+        internal: true
+
+    extractors:
+      - type: regex
+        name: mx_host
+        part: raw
+        group: 1
+        internal: true
+        regex:
+          - '(?im)^[^;\s]\S*\s+\d+\s+IN\s+MX\s+\d+\s+(\S+)\s*$'
+
+  - id: mx-resolve
+    name: "{{mx_target}}"
+    type: A
+    class: inet
+    recursion: true
+    retries: 2
+
+    matchers:
+      - type: word
+        condition: or
+        words:
+          - "NXDOMAIN"
+          - "SERVFAIL"
+          - "REFUSED"
+
+    extractors:
+      - type: dsl
+        name: dead_mx
+        dsl:
+          - "mx_target"

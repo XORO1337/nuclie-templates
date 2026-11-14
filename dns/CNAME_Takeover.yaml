@@ -2,7 +2,7 @@ id: CNAME_Takeover
 
 info:
   name: Dangling CNAME - Subdomain Takeover Candidate
-  author: n0x
+  author: XORO1337
   severity: medium
   description: |
     The target resolves through a CNAME chain that terminates in NXDOMAIN.

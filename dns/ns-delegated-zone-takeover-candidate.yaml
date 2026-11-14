@@ -1,0 +1,82 @@
+id: ns_delegated_zone_takeover
+
+info:
+  name: NS Delegation - Dead Nameserver Takeover Candidate
+  author: XORO1337
+  severity: high
+  description: |
+    The target has NS records delegating a zone to one or more nameservers, and
+    at least one delegated nameserver does not resolve (NXDOMAIN, SERVFAIL, or
+    REFUSED). This is a delegated-zone takeover candidate: if the nameserver
+    name can be registered or claimed at the DNS provider, an attacker may be
+    able to answer for the delegated zone.
+
+    This template checks A records only. A nameserver that is IPv6-only may be
+    reported as dead; confirm AAAA resolution before treating it as a finding.
+  impact: |
+    A claimed delegated nameserver can answer DNS for the zone, enabling DNS
+    hijacking, certificate issuance, mail interception, and subdomain takeover.
+  remediation: |
+    Remove stale NS records, restore the delegated nameservers, or move the
+    delegation to nameservers controlled by the organization. Monitor
+    delegated zones for non-resolving NS targets.
+  reference:
+    - https://www.icann.org/resources/pages/dns-2017-06-27-en
+    - https://www.cloudflare.com/learning/dns/dns-records/dns-ns-record/
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 3
+  tags: dns,takeover,ns,delegation,candidate
+
+flow: |
+  dns(1);
+  for (let ns of iterate(template["ns_host"])) {
+    set("ns_target", ns);
+    dns(2);
+  }
+
+dns:
+  - id: ns-records
+    name: "{{FQDN}}"
+    type: NS
+    class: inet
+    recursion: true
+    retries: 3
+
+    matchers:
+      - type: regex
+        part: answer
+        regex:
+          - '(?i)IN\s+NS\s+'
+        internal: true
+
+    extractors:
+      - type: regex
+        name: ns_host
+        part: raw
+        group: 1
+        internal: true
+        regex:
+          - '(?im)^[^;\s]\S*\s+\d+\s+IN\s+NS\s+(\S+)\s*$'
+
+  - id: ns-resolve
+    name: "{{ns_target}}"
+    type: A
+    class: inet
+    recursion: true
+    retries: 2
+
+    matchers:
+      - type: word
+        condition: or
+        words:
+          - "NXDOMAIN"
+          - "SERVFAIL"
+          - "REFUSED"
+
+    extractors:
+      - type: dsl
+        name: dead_nameserver
+        dsl:
+          - "ns_target"

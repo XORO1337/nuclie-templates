@@ -1,0 +1,178 @@
+id: cname_takeover_2
+
+info:
+  name: CNAME Takeover - Provider Unclaimed Page
+  author: XORO1337
+  severity: high
+  description: |
+    The hostname has a CNAME pointing at a third-party service, and the HTTP
+    response contains that service's "resource not found / unclaimed" page.
+    This is stronger evidence than a dangling CNAME alone, but the provider
+    still has to allow the specific resource name to be claimed.
+
+    Confirm by attempting to create the resource in an authorized account, or
+    by checking the provider API, before reporting.
+  impact: |
+    If the CNAME target can be claimed, an attacker can host arbitrary content
+    on the organization's subdomain and abuse its trust, cookies, and origin.
+  remediation: |
+    Remove the stale CNAME or reclaim the target resource. Add automated checks
+    for CNAME targets that return provider-specific unclaimed-resource pages.
+  reference:
+    - https://github.com/EdOverflow/can-i-take-over-xyz
+    - https://docs.microsoft.com/en-us/azure/security/fundamentals/subdomain-takeover
+  classification:
+    cwe-id: CWE-404
+  metadata:
+    max-request: 2
+  tags: dns,takeover,cname,http
+
+dns:
+  - name: "{{FQDN}}"
+    type: A
+    class: inet
+    recursion: true
+    retries: 3
+
+    extractors:
+      - type: dsl
+        name: cname
+        dsl:
+          - cname
+        internal: true
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        condition: and
+        dsl:
+          - |
+            contains(cname, 'github.io') ||
+            contains(cname, 'github.com') ||
+            contains(cname, 'herokuapp.com') ||
+            contains(cname, 'herokudns.com') ||
+            contains(cname, 's3.amazonaws.com') ||
+            contains(cname, 'amazonaws.com') ||
+            contains(cname, 'cloudfront.net') ||
+            contains(cname, 'azurewebsites.net') ||
+            contains(cname, 'cloudapp.azure.com') ||
+            contains(cname, 'azurefd.net') ||
+            contains(cname, 'trafficmanager.net') ||
+            contains(cname, 'blob.core.windows.net') ||
+            contains(cname, 'netlify.app') ||
+            contains(cname, 'netlify.com') ||
+            contains(cname, 'vercel.app') ||
+            contains(cname, 'vercel-dns.com') ||
+            contains(cname, 'surge.sh') ||
+            contains(cname, 'bitbucket.io') ||
+            contains(cname, 'ghost.io') ||
+            contains(cname, 'pantheonsite.io') ||
+            contains(cname, 'wpengine.com') ||
+            contains(cname, 'zendesk.com') ||
+            contains(cname, 'readme.io') ||
+            contains(cname, 'readthedocs.io') ||
+            contains(cname, 'statuspage.io') ||
+            contains(cname, 'fastly.net') ||
+            contains(cname, 'myshopify.com') ||
+            contains(cname, 'shopify.com') ||
+            contains(cname, 'tumblr.com') ||
+            contains(cname, 'wordpress.com') ||
+            contains(cname, 'cargo.site') ||
+            contains(cname, 'unbounce.com') ||
+            contains(cname, 'wixsite.com') ||
+            contains(cname, 'webflow.io') ||
+            contains(cname, 'softr.app') ||
+            contains(cname, 'framer.app') ||
+            contains(cname, 'strikingly.com') ||
+            contains(cname, 'squarespace.com') ||
+            contains(cname, 'smugmug.com') ||
+            contains(cname, 'teamwork.com') ||
+            contains(cname, 'helpscout.net') ||
+            contains(cname, 'helpjuice.com') ||
+            contains(cname, 'uservoice.com') ||
+            contains(cname, 'announcekit.app') ||
+            contains(cname, 'gitbook.io') ||
+            contains(cname, 'jetbrains.space') ||
+            contains(cname, 'ngrok.io') ||
+            contains(cname, 'ngrok-free.app') ||
+            contains(cname, 'pingdom.com') ||
+            contains(cname, 'uptimerobot.com') ||
+            contains(cname, 'worksites.net') ||
+            contains(cname, 'squadcast.com') ||
+            contains(cname, 'tave.com') ||
+            contains(cname, 'vend.com') ||
+            contains(cname, 'wishpond.com') ||
+            contains(cname, 'greatpages.com') ||
+            contains(cname, 'gohire.com') ||
+            contains(cname, 'jazzhr.com') ||
+            contains(cname, 'smartjob.com') ||
+            contains(cname, 'flexbe.com') ||
+            contains(cname, 'frontify.com') ||
+            contains(cname, 'gemfury.com') ||
+            contains(cname, 'getresponse.com') ||
+            contains(cname, 'leadpages.com') ||
+            contains(cname, 'launchrock.com') ||
+            contains(cname, 'mashery.com') ||
+            contains(cname, 'meteor.com') ||
+            contains(cname, 'pagewiz.com') ||
+            contains(cname, 'proposify.com') ||
+            contains(cname, 'simplebooklet.com') ||
+            contains(cname, 'sprintful.com') ||
+            contains(cname, 'uberflip.com') ||
+            contains(cname, 'wufoo.com') ||
+            contains(cname, 'aha.io') ||
+            contains(cname, 'agilecrm.com') ||
+            contains(cname, 'animaapp.com') ||
+            contains(cname, 'bigcartel.com') ||
+            contains(cname, 'campaignmonitor.com') ||
+            contains(cname, 'canny.io') ||
+            contains(cname, 'cargocollective.com') ||
+            contains(cname, 'clever.com') ||
+            contains(cname, 'hatenablog.com') ||
+            contains(cname, 'helprace.com') ||
+            contains(cname, 'hubspot.com') ||
+            contains(cname, 'intercom.com') ||
+            contains(cname, 'kinsta.com') ||
+            contains(cname, 'short.io') ||
+            contains(cname, 'tilda.ws') ||
+            contains(cname, 'wasabi.com')
+          - "status_code >= 200 && status_code < 500"
+
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "There isn't a GitHub Pages site here."
+          - "No such app"
+          - "There's nothing here, yet."
+          - "NoSuchBucket"
+          - "The specified bucket does not exist"
+          - "NoSuchWebsiteConfiguration"
+          - "404 Web Site not found"
+          - "This site is not configured"
+          - "Error 404 - Web app not found."
+          - "BlobNotFound"
+          - "The specified resource does not exist"
+          - "Sorry, this shop is currently unavailable."
+          - "This help center no longer exists"
+          - "Help Center Closed"
+          - "Repository not found"
+          - "The thing you were looking for is no longer here"
+          - "project not found"
+          - "Project not found"
+          - "Not Found - Request ID"
+          - "The deployment could not be found"
+          - "The site you were looking for couldn't be found."
+          - "Whatever you were looking for isn't here."
+          - "Fastly error: unknown domain"
+          - "The request could not be satisfied"
+          - "This domain is not configured"
+          - "Domain not found"
+          - "This page is not yet available"
+          - "This organization has no pages"
+          - "No site found"
