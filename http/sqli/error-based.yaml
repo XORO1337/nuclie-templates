@@ -1,0 +1,66 @@
+id: sqli-error-based
+
+info:
+  name: Error-Based SQL Injection
+  author: n0x
+  severity: high
+  description: |
+    Fuzzes query-string and body values with common SQL metacharacters and
+    looks for database error messages in the response. A match indicates that
+    user input reaches a SQL parser without adequate error handling or
+    parameterization; confirm manually with a DBMS-specific payload and a
+    benign proof of concept.
+
+    This is a DAST/fuzzing template. Run it with -dast (or -fuzz on older
+    Nuclei versions) and only against authorized targets.
+  impact: |
+    An attacker may be able to read or modify database contents, bypass
+    authentication, or execute database-specific functions.
+  remediation: |
+    Use parameterized queries / prepared statements, avoid string
+    concatenation, suppress verbose database errors, and apply least-privilege
+    database accounts.
+  reference:
+    - https://owasp.org/www-community/attacks/SQL_Injection
+    - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
+  classification:
+    cwe-id: CWE-89
+  metadata:
+    max-request: 20
+  tags: sqli,sqli-error,dast,web
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - 'method == "GET" || method == "POST"'
+
+    payloads:
+      sqli:
+        - "'"
+        - '"'
+        - "')"
+        - '"))'
+        - "' OR '1'='1"
+        - '" OR "1"="1'
+        - "' AND 1=1-- -"
+        - "' AND 1=2-- -"
+        - "' UNION SELECT NULL-- -"
+        - "\\"
+
+    attack: batteringram
+    fuzzing:
+      - parts:
+          - query
+          - body
+        type: postfix
+        mode: single
+        fuzz:
+          - "{{sqli}}"
+
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)(SQL syntax.*MySQL|Warning.*mysql_|valid MySQL result|MySqlClient\.|PostgreSQL.*ERROR|Warning.*pg_|valid PostgreSQL result|Npgsql\.|Driver.*SQL[ -]Server|OLE DB.*SQL Server|SQLServer JDBC Driver|Unclosed quotation mark after the character string|quoted string not properly terminated|ORA-[0-9]{5}|Oracle error|SQLite/JDBCDriver|SQLite\.Exception|System\.Data\.SQLite\.SQLiteException|Microsoft Access Driver|JET Database Engine|Access Database Engine|ODBC Microsoft Access|Syntax error in string in query expression|SQLSTATE\[[0-9A-Z]{5}\])'

